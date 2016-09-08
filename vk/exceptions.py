@@ -1,29 +1,35 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
+
 
 # API Error Codes
-AUTHORIZATION_FAILED = 5    # Invalid access token
+AUTHORIZATION_FAILED = 5  # Invalid access token
 PERMISSION_IS_DENIED = 7
 CAPTCHA_IS_NEEDED = 14
-ACCESS_DENIED = 15          # No access to call this method
-                            # User deactivated
-INVALID_USER_ID = 113
+ACCESS_DENIED = 15  # No access to call this method
+
+INVALID_USER_ID = 113  # User deactivated
 
 
-class VkException(Exception):
+class VKException(Exception):
     pass
 
 
-class VkAuthError(VkException):
+class VKAuthError(VKException):
     pass
 
 
-class VkAPIError(VkException):
-    __slots__ = ['error', 'code', 'message', 'request_params', 'redirect_uri']
+class VKAPIError(VKException):
+    __slots__ = [
+        'error', 'code', 'message',
+        'request_params', 'redirect_uri'
+    ]
 
     CAPTCHA_NEEDED = 14
     ACCESS_DENIED = 15
 
     def __init__(self, error_data):
-        super(VkAPIError, self).__init__()
+        super(VKAPIError, self).__init__()
         self.error_data = error_data
         self.code = error_data.get('error_code')
         self.message = error_data.get('error_msg')

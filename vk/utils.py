@@ -1,7 +1,10 @@
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 
 import re
 import logging
 from collections import Iterable
+import six
 
 import requests
 
@@ -9,14 +12,7 @@ import requests
 logger = logging.getLogger('vk')
 
 
-try:
-    # Python 2
-    str_type = unicode
-except NameError:
-    # Python 3
-    str_type = str
-
-STRING_TYPES = (str_type, bytes, bytearray)
+STRING_TYPES = (six.text_type, bytes, bytearray)
 
 try:
     # Python 2
@@ -53,7 +49,7 @@ def stringify_values(dictionary):
     stringified_values_dict = {}
     for key, value in dictionary.items():
         if isinstance(value, Iterable) and not isinstance(value, STRING_TYPES):
-            value = u','.join(map(str_type, value))
+            value = ','.join(map(six.text_type, value))
         stringified_values_dict[key] = value
     return stringified_values_dict
 
@@ -74,7 +70,11 @@ def get_form_action(html):
 
 class LoggingSession(requests.Session):
     def request(self, method, url, **kwargs):
-        logger.debug('Request: %s %s, params=%r, data=%r', method, url, kwargs.get('params'), kwargs.get('data'))
+        logger.debug(
+            'Request: %s %s, params=%r, data=%r',
+            method, url, kwargs.get('params'), kwargs.get('data'))
+
         response = super(LoggingSession, self).request(method, url, **kwargs)
-        logger.debug('Response: %s %s', response.status_code, response.url)
+        logger.debug(
+            'Response: %s %s', response.status_code, response.url)
         return response

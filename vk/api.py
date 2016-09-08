@@ -1,11 +1,13 @@
-# coding=utf8
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 
 import logging
 import logging.config
+import six
 
 from vk.logs import LOGGING_CONFIG
-from vk.utils import stringify_values, json_iter_parse, LoggingSession, str_type
-from vk.exceptions import VkAuthError, VkAPIError
+from vk.utils import stringify_values, json_iter_parse, LoggingSession
+from vk.exceptions import VKAuthError, VKAPIError
 from vk.mixins import AuthMixin, InteractiveMixin
 
 
@@ -20,8 +22,9 @@ class Session(object):
     API_URL = 'https://api.vk.com/method/'
 
     def __init__(self, access_token=None):
-
-        logger.debug('API.__init__(access_token=%(access_token)r)', {'access_token': access_token})
+        logger.debug(
+            'API.__init__(access_token=%(access_token)r)',
+            {'access_token': access_token})
 
         self.access_token = access_token
         self.access_token_is_needed = False
@@ -43,7 +46,7 @@ class Session(object):
     @access_token.setter
     def access_token(self, value):
         self._access_token = value
-        if isinstance(value, str_type) and len(value) >= 12:
+        if isinstance(value, six.text_type) and len(value) >= 12:
             self.censored_access_token = '{}***{}'.format(value[:4], value[-4:])
         else:
             self.censored_access_token = value
@@ -61,7 +64,6 @@ class Session(object):
         return self._access_token
 
     def make_request(self, method_request, captcha_response=None):
-
         logger.debug('Prepare API Method request')
 
         response = self.send_api_request(method_request, captcha_response=captcha_response)
@@ -80,7 +82,7 @@ class Session(object):
 
             elif 'error' in response_or_error:
                 error_data = response_or_error['error']
-                error = VkAPIError(error_data)
+                error = VKAPIError(error_data)
 
                 if error.is_captcha_needed():
                     captcha_key = self.get_captcha_key(error.captcha_img)
@@ -103,7 +105,7 @@ class Session(object):
 
     def send_api_request(self, request, captcha_response=None):
         url = self.API_URL + request._method_name
-        method_args = request._api._method_default_args.copy()
+        method_args = request.api._method_default_args.copy()
         method_args.update(stringify_values(request._method_args))
         access_token = self.access_token
         if access_token:
@@ -111,7 +113,7 @@ class Session(object):
         if captcha_response:
             method_args['captcha_sid'] = captcha_response['sid']
             method_args['captcha_key'] = captcha_response['key']
-        timeout = request._api._timeout
+        timeout = request.api.timeout
         response = self.requests_session.post(url, method_args, timeout=timeout)
         return response
 
@@ -127,22 +129,22 @@ class Session(object):
         Default behavior on 2-AUTH CODE is to raise exception
         Reload this in child
         """           
-        raise VkAuthError('Authorization error (2-factor code is needed)')
+        raise VKAuthError('Authorization error (2-factor code is needed)')
     
     def auth_captcha_is_needed(self, content, session):
         """
         Default behavior on CAPTCHA is to raise exception
         Reload this in child
-        """              
-        raise VkAuthError('Authorization error (captcha)')
-    
+        """
+        raise VKAuthError('Authorization error (captcha)')
+
     def phone_number_is_needed(self, content, session):
         """
         Default behavior on PHONE NUMBER is to raise exception
         Reload this in child
         """
         logger.error('Authorization error (phone number is needed)')
-        raise VkAuthError('Authorization error (phone number is needed)')
+        raise VKAuthError('Authorization error (phone number is needed)')
 
 
 class API(object):
@@ -157,6 +159,14 @@ class API(object):
     def __call__(self, method_name, **method_kwargs):
         return getattr(self, method_name)(**method_kwargs)
 
+    @property
+    def session(self):
+        return self._session
+
+    @property
+    def timeout(self):
+        return self._timeout
+
 
 class Request(object):
     __slots__ = ('_api', '_method_name', '_method_args')
@@ -170,7 +180,11 @@ class Request(object):
 
     def __call__(self, **method_args):
         self._method_args = method_args
-        return self._api._session.make_request(self)
+        return self.api.session.make_request(self)
+
+    @property
+    def api(self):
+        return self._api
 
 
 class AuthSession(AuthMixin, Session):

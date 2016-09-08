@@ -1,8 +1,9 @@
-# coding=utf8
+# -*- coding: utf-8 -*-
+from __future__ import unicode_literals
 
 import logging
 
-from vk.exceptions import VkAuthError
+from vk.exceptions import VKAuthError
 from vk.utils import raw_input, get_url_query, LoggingSession, get_form_action
 
 
@@ -16,15 +17,18 @@ class AuthMixin(object):
     CAPTCHA_URI = 'https://m.vk.com/captcha.php'
 
     def __init__(self, app_id=None, user_login='', user_password='', scope='offline', **kwargs):
-        logger.debug('AuthMixin.__init__(app_id=%(app_id)r, user_login=%(user_login)r, user_password=%(user_password)r, **kwargs=%(kwargs)s)',
+        logger.debug(
+            'AuthMixin.__init__(app_id=%(app_id)r, user_login=%(user_login)r, '
+            'user_password=%(user_password)r, **kwargs=%(kwargs)s)',
             dict(app_id=app_id, user_login=user_login, user_password=user_password, kwargs=kwargs))
 
         super(AuthMixin, self).__init__(**kwargs)
 
         self.app_id = app_id
-        self.user_login = user_login
-        self.user_password = user_password
+        self._user_login = user_login
+        self._user_password = user_password
         self.scope = scope
+        self.auth_session = None
 
         # Some API methods get args (e.g. user id) from access token.
         # If we define user login, we need get access token now.
@@ -63,8 +67,7 @@ class AuthMixin(object):
         """
         logger.debug('AuthMixin.get_access_token()')
 
-        auth_session = LoggingSession()
-        with auth_session as self.auth_session:
+        with LoggingSession() as auth_session:
             self.auth_session = auth_session
             self.login()
             auth_response_url_query = self.oauth2_authorization()
@@ -72,17 +75,16 @@ class AuthMixin(object):
         if 'access_token' in auth_response_url_query:
             return auth_response_url_query['access_token']
         else:
-            raise VkAuthError('OAuth2 authorization error')
+            raise VKAuthError('OAuth2 authorization error')
 
     def login(self):
         """
         Login
         """
-
         response = self.auth_session.get(self.LOGIN_URL)
         login_form_action = get_form_action(response.text)
         if not login_form_action:
-            raise VkAuthError('VK changed login flow')
+            raise VKAuthError('VK changed login flow')
 
         login_form_data = {
             'email': self.user_login,
@@ -105,7 +107,7 @@ class AuthMixin(object):
         else:
             message = 'Authorization error (incorrect password)'
             logger.error(message)
-            raise VkAuthError(message)
+            raise VKAuthError(message)
 
     def oauth2_authorization(self):
         """
@@ -140,7 +142,7 @@ class AuthMixin(object):
         else:
             error_message = 'VK error: [{}] {}'.format(response_json['error'], response_json['error_description'])
         logger.error('Permissions obtained')
-        raise VkAuthError(error_message)
+        raise VKAuthError(error_message)
 
     def auth_check_is_needed(self, html):
         logger.info('User enabled 2 factors authorization. Auth check code is needed')
@@ -162,10 +164,11 @@ class AuthMixin(object):
         captcha_form_action = get_form_action(response.text)
         logger.debug('form_url %s', captcha_form_action)
         if not captcha_form_action:
-            raise VkAuthError('Cannot find form url')
+            raise VKAuthError('Cannot find form url')
 
         # todo Are we sure that `response_url_dict` doesn't contain CAPTCHA image url?
-        captcha_url = '%s?s=%s&sid=%s' % (self.CAPTCHA_URI, response_url_dict['s'], response_url_dict['sid'])
+        captcha_url = '%s?s=%s&sid=%s' % \
+                      (self.CAPTCHA_URI, response_url_dict['s'], response_url_dict['sid'])
         # logger.debug('Captcha url %s', captcha_url)
 
         login_form_data['captcha_sid'] = response_url_dict['sid']
@@ -178,10 +181,10 @@ class AuthMixin(object):
         #     raise VkAuthError('Authorization error (Bad password or captcha key)')
 
     def phone_number_is_needed(self, text):
-        raise VkAuthError('Phone number is needed')
+        raise VKAuthError('Phone number is needed')
 
     def get_auth_check_code(self):
-        raise VkAuthError('Auth check code is needed')
+        raise VKAuthError('Auth check code is needed')
 
 
 class InteractiveMixin(object):
