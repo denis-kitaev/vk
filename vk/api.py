@@ -4,6 +4,14 @@ from __future__ import unicode_literals
 import logging
 import logging.config
 import six
+try:
+    # Python2
+    from urllib import urlencode
+except ImportError:
+    # Python3
+    from urllib.parse import urlencode
+
+import requests
 
 from vk.logs import LOGGING_CONFIG
 from vk.utils import stringify_values, json_iter_parse, LoggingSession
@@ -148,43 +156,58 @@ class Session(object):
 
 
 class API(object):
-    def __init__(self, session, timeout=10, **method_default_args):
-        self._session = session
+    url = 'https://api.vk.com/method/'
+    version = '5.53'
+
+    def __init__(self, session, timeout=10):
+        self._vk_session = session
+        self._http_session = requests.Session()
         self._timeout = timeout
         self._method_default_args = method_default_args
 
-    def __getattr__(self, method_name):
-        return Request(self, method_name)
+    def __getattr__(self, namespace):
+        return APINamespace(self, namespace)
 
-    def __call__(self, method_name, **method_kwargs):
-        return getattr(self, method_name)(**method_kwargs)
+    def _get_access_token(self):
+        return ''
 
-    @property
-    def session(self):
-        return self._session
+    def _get_url(self, method):
+        query_dict = {
+            'v': self.version,
+            'access_token': self._get_access_token()
+        }
+        query_params = urlencode(query_dict)
+        return '%s%s?%s' % (self.url, method, query_params)
 
-    @property
-    def timeout(self):
-        return self._timeout
+    def call(self, method, **params):
+        url = self._get_url(method)
+        return self._http_session.post(url, json=params)
 
 
-class Request(object):
-    __slots__ = ('_api', '_method_name', '_method_args')
-
-    def __init__(self, api, method_name):
+class APINamespace(object):
+    """
+    API namespace class
+    """
+    def __init__(self, api, name):
         self._api = api
-        self._method_name = method_name
+        self._name = name
 
-    def __getattr__(self, method_name):
-        return Request(self._api, self._method_name + '.' + method_name)
+    def __getattr__(self, item):
+        return APIMethod(self._api, self._name, item)
 
-    def __call__(self, **method_args):
-        self._method_args = method_args
-        return self.api.session.make_request(self)
+
+class APIMethod(object):
+    def __init__(self, api, namespace, name):
+        self._api = api
+        self._namespace = namespace
+        self._name = name
+
+    def __call__(self, **params):
+        self._api.call(self.method_name, **params)
 
     @property
-    def api(self):
-        return self._api
+    def method_name(self):
+        return '%s.%s' % (self._namespace, self._name)
 
 
 class AuthSession(AuthMixin, Session):
